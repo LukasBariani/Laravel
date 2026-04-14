@@ -1,9 +1,14 @@
 <x-layout>
-    @if ($errors->any()){
-        {dd($errors->all())}
-    }
-        
+    @if ($errors->any())
+        <div class="alert alert-error mb-4">
+            <ul>
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
     @endif
+    
     <x-slot:title>
         Home Feed
     </x-slot:title>
