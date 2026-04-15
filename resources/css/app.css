@@ -12,52 +12,35 @@
         "Noto Color Emoji";
 
     --animate-fade-out: fade-out 4s ease-in-out forwards;
+}
 
-    @keyframes fade-out {
-        0%,
-        70% {
-            opacity: 1;
-        }
-        100% {
-            opacity: 0;
-            pointer-events: none;
-        }
+@keyframes fade-out {
+    0%, 70% {
+        opacity: 1;
+        transform: translateY(0);
     }
-    /* Ajuste para o toast não ficar atrás dos elementos */
-    .toast {
-        z-index: 9999 !important;
-        position: fixed !important;
-    }
-
-    /* Garantir que o toast fique acima de tudo */
-    .toast-top-center {
-        top: 80px !important; /* Ajuste conforme sua navbar */
-        position: fixed !important;
-    }
-
-    /* Animação do toast */
-    .animate-fade-out {
-        animation: fade-out 4s ease-in-out forwards;
-    }
-
-    @keyframes fade-out {
-        0%,
-        70% {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        100% {
-            opacity: 0;
-            transform: translateY(-20px);
-            pointer-events: none;
-        }
-    }
-
-    /* Garantir que os cards tenham z-index menor */
-    .card {
-        position: relative;
-        z-index: 1;
+    100% {
+        opacity: 0;
+        transform: translateY(-20px);
+        pointer-events: none;
     }
 }
 
-/* Remova todo o resto do CSS que define variáveis e temas */
+.toast {
+    z-index: 9999 !important;
+    position: fixed !important;
+}
+
+.toast-top-center {
+    top: 80px !important;
+    position: fixed !important;
+}
+
+.animate-fade-out {
+    animation: fade-out 4s ease-in-out forwards;
+}
+
+.card {
+    position: relative;
+    z-index: 1;
+}
