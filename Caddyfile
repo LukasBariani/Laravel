@@ -1,0 +1,9 @@
+{
+	admin off
+}
+
+:8080 {
+	root * public
+	encode gzip
+	php_server
+}
