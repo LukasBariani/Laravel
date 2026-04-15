@@ -1,0 +1,10 @@
+{
+    admin off
+}
+
+{$PORT} {
+    root * public
+    php_fastcgi localhost:9000
+    encode gzip
+    file_server
+}
