@@ -4,74 +4,160 @@ namespace App\Http\Controllers;
 
 use App\Models\Chirp;
 use Illuminate\Http\Request;
-use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Embed\Embed;
 
 class ChirpController extends Controller
 {
-
-    use AuthorizesRequests;
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        $chirps = Chirp::with('user')
-            ->latest()
-            ->take(50)
-            ->get();
-        return view('home', ['chirps' => $chirps]);
+        $chirps = Chirp::with('user')->latest()->get();
+        return view('chirps.index', compact('chirps'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'message' => 'required|string|max:255',
+            'message' => 'required|string|max:500',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // 5MB
+            'audio' => 'nullable|file|mimes:mp3,wav,ogg,m4a|max:10240', // 10MB
         ]);
 
-        // Use the authenticated user
-        auth()->user()->chirps()->create($validated);
+        $chirp = new Chirp();
+        $chirp->message = $validated['message'];
+        $chirp->user_id = auth()->id();
 
-        return redirect('/')->with('success', 'Your chirp has been posted!');
+        // Processar imagem
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('chirps/images', 'public');
+            $chirp->image = $path;
+        }
+
+        // Processar áudio
+        if ($request->hasFile('audio')) {
+            $path = $request->file('audio')->store('chirps/audio', 'public');
+            $chirp->audio = $path;
+        }
+
+        // Processar links (extrair metadados)
+        if ($request->filled('message')) {
+            $this->extractLinks($request->message, $chirp);
+        }
+
+        $chirp->save();
+
+        return redirect()->route('chirps.index')
+            ->with('success', 'Chirp publicado com sucesso!');
     }
 
     public function edit(Chirp $chirp)
     {
-        $this->authorize('update', $chirp);
-
+        Gate::authorize('update', $chirp);
         return view('chirps.edit', compact('chirp'));
     }
 
     public function update(Request $request, Chirp $chirp)
     {
-        $this->authorize('update', $chirp);
+        Gate::authorize('update', $chirp);
 
         $validated = $request->validate([
-            'message' => 'required|string|max:255',
+            'message' => 'required|string|max:500',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120',
+            'audio' => 'nullable|file|mimes:mp3,wav,ogg,m4a|max:10240',
+            'remove_image' => 'nullable|boolean',
+            'remove_audio' => 'nullable|boolean',
         ]);
 
-        $chirp->update($validated);
+        $chirp->message = $validated['message'];
 
-        return redirect('/')->with('success', 'Chirp updated!');
+        // Remover imagem
+        if ($request->has('remove_image') && $chirp->image) {
+            Storage::disk('public')->delete($chirp->image);
+            $chirp->image = null;
+        }
+
+        // Remover áudio
+        if ($request->has('remove_audio') && $chirp->audio) {
+            Storage::disk('public')->delete($chirp->audio);
+            $chirp->audio = null;
+        }
+
+        // Upload nova imagem
+        if ($request->hasFile('image')) {
+            if ($chirp->image) {
+                Storage::disk('public')->delete($chirp->image);
+            }
+            $path = $request->file('image')->store('chirps/images', 'public');
+            $chirp->image = $path;
+        }
+
+        // Upload novo áudio
+        if ($request->hasFile('audio')) {
+            if ($chirp->audio) {
+                Storage::disk('public')->delete($chirp->audio);
+            }
+            $path = $request->file('audio')->store('chirps/audio', 'public');
+            $chirp->audio = $path;
+        }
+
+        // Processar links novamente
+        $this->extractLinks($request->message, $chirp);
+
+        $chirp->save();
+
+        return redirect()->route('chirps.index')
+            ->with('success', 'Chirp atualizado com sucesso!');
     }
 
     public function destroy(Chirp $chirp)
     {
-        $this->authorize('delete', $chirp);
+        Gate::authorize('delete', $chirp);
+
+        // Remover arquivos
+        if ($chirp->image) {
+            Storage::disk('public')->delete($chirp->image);
+        }
+        if ($chirp->audio) {
+            Storage::disk('public')->delete($chirp->audio);
+        }
 
         $chirp->delete();
 
-        return redirect('/')->with('success', 'Chirp deleted!');
+        return redirect()->route('chirps.index')
+            ->with('success', 'Chirp excluído com sucesso!');
+    }
+
+    // Método para extrair links da mensagem
+    private function extractLinks($message, &$chirp)
+    {
+        // Limpar dados de link anteriores
+        $chirp->link_url = null;
+        $chirp->link_title = null;
+        $chirp->link_description = null;
+        $chirp->link_image = null;
+
+        // Regex para encontrar URLs
+        $pattern = '/https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)/';
+
+        if (preg_match($pattern, $message, $matches)) {
+            $url = $matches[0];
+
+            try {
+                // Usar embed para extrair metadados (requer instalação)
+                $embed = new Embed();
+                $info = $embed->get($url);
+
+                $chirp->link_url = $url;
+                $chirp->link_title = $info->title ?? null;
+                $chirp->link_description = $info->description ?? null;
+                $chirp->link_image = $info->image ?? null;
+
+            } catch (\Exception $e) {
+                // Fallback simples
+                $chirp->link_url = $url;
+                $chirp->link_title = $url;
+            }
+        }
     }
 }
