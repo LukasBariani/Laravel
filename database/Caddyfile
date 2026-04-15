@@ -4,7 +4,7 @@
 
 {$PORT} {
     root * public
-    php_fastcgi localhost:9000
+    php
     encode gzip
     file_server
 }
